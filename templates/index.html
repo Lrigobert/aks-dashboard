@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AKS Dashboard — aks-tp-cluster</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Styles personnalisés -->
+  <link href="/static/css/style.css" rel="stylesheet" />
+</head>
+<body>
+
+<!-- ============================================================
+     SIDEBAR
+============================================================ -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <i class="fa-brands fa-docker text-info me-2" style="font-size:1.4rem;"></i>
+      <span class="fw-bold text-white">AKS Dashboard</span>
+    </div>
+    <div class="cluster-badge">
+      <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">
+        <i class="fa-solid fa-circle fa-xs me-1"></i>aks-tp-cluster
+      </span>
+    </div>
+  </div>
+
+  <ul class="sidebar-nav">
+    <li class="nav-section-label">Navigation</li>
+    <li>
+      <a href="#" class="sidebar-link active" data-section="overview">
+        <i class="fa-solid fa-gauge-high"></i>
+        <span>Vue d'ensemble</span>
+      </a>
+    </li>
+    <li>
+      <a href="#" class="sidebar-link" data-section="pods">
+        <i class="fa-solid fa-cubes"></i>
+        <span>Pods</span>
+        <span class="badge bg-secondary ms-auto" id="nav-pod-count">—</span>
+      </a>
+    </li>
+    <li>
+      <a href="#" class="sidebar-link" data-section="deployments">
+        <i class="fa-solid fa-rocket"></i>
+        <span>Deployments</span>
+      </a>
+    </li>
+    <li>
+      <a href="#" class="sidebar-link" data-section="nodes">
+        <i class="fa-solid fa-server"></i>
+        <span>Nœuds</span>
+      </a>
+    </li>
+    <li class="nav-section-label mt-2">Application</li>
+    <li>
+      <a href="http://{{ nginx_ip }}" target="_blank" class="sidebar-link text-info">
+        <i class="fa-brands fa-nginx"></i>
+        <span>Ouvrir Nginx</span>
+        <i class="fa-solid fa-arrow-up-right-from-square fa-xs ms-auto"></i>
+      </a>
+    </li>
+  </ul>
+
+  <div class="sidebar-footer">
+    <div class="text-muted small text-center">
+      <i class="fa-solid fa-cloud me-1"></i>francecentral
+      <span class="mx-2">•</span>
+      <i class="fa-brands fa-microsoft me-1"></i>Azure
+    </div>
+  </div>
+</nav>
+
+<!-- ============================================================
+     CONTENU PRINCIPAL
+============================================================ -->
+<div class="main-content">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="d-flex align-items-center gap-3">
+      <button class="btn btn-sm btn-outline-secondary d-lg-none" id="sidebar-toggle">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <div>
+        <h1 class="topbar-title mb-0">AKS Dashboard</h1>
+        <span class="text-muted small">Cluster Kubernetes · Azure Monitor activé</span>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+      <span class="text-muted small d-none d-md-inline" id="last-update">
+        <i class="fa-regular fa-clock me-1"></i>Chargement…
+      </span>
+      <button class="btn btn-primary btn-sm" id="btn-refresh" onclick="refreshAll()">
+        <i class="fa-solid fa-rotate-right me-1"></i>Rafraîchir
+      </button>
+      <a href="http://{{ nginx_ip }}" target="_blank" class="btn btn-outline-info btn-sm">
+        <i class="fa-brands fa-nginx me-1"></i>Nginx <span class="text-muted">{{ nginx_ip }}</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- ALERTE ERREUR -->
+  <div id="error-banner" class="alert alert-danger alert-dismissible mx-3 mt-3 d-none" role="alert">
+    <i class="fa-solid fa-triangle-exclamation me-2"></i>
+    <span id="error-message"></span>
+    <button type="button" class="btn-close" onclick="document.getElementById('error-banner').classList.add('d-none')"></button>
+  </div>
+
+  <!-- =========================================================
+       SECTION : VUE D'ENSEMBLE
+  ========================================================= -->
+  <section id="section-overview" class="content-section active">
+    <div class="section-header">
+      <h2><i class="fa-solid fa-gauge-high me-2 text-primary"></i>Vue d'ensemble</h2>
+      <p class="text-muted">État en temps réel du cluster AKS déployé sur Azure</p>
+    </div>
+
+    <!-- Cartes de statut -->
+    <div class="row g-4 mb-4">
+      <div class="col-sm-6 col-xl-3">
+        <div class="stat-card">
+          <div class="stat-icon bg-primary-subtle text-primary">
+            <i class="fa-solid fa-server"></i>
+          </div>
+          <div>
+            <div class="stat-value" id="stat-nodes">—</div>
+            <div class="stat-label">Nœuds actifs</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-xl-3">
+        <div class="stat-card">
+          <div class="stat-icon bg-success-subtle text-success">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <div>
+            <div class="stat-value" id="stat-running">—</div>
+            <div class="stat-label">Pods Running</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-xl-3">
+        <div class="stat-card">
+          <div class="stat-icon bg-info-subtle text-info">
+            <i class="fa-solid fa-cubes"></i>
+          </div>
+          <div>
+            <div class="stat-value" id="stat-total-pods">—</div>
+            <div class="stat-label">Pods total</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-xl-3">
+        <div class="stat-card">
+          <div class="stat-icon bg-warning-subtle text-warning">
+            <i class="fa-solid fa-code-branch"></i>
+          </div>
+          <div>
+            <div class="stat-value" id="stat-version">—</div>
+            <div class="stat-label">Version K8s</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Infos cluster + Accès Nginx -->
+    <div class="row g-4">
+      <!-- Infos cluster -->
+      <div class="col-lg-6">
+        <div class="card dashboard-card h-100">
+          <div class="card-header">
+            <i class="fa-brands fa-microsoft text-primary me-2"></i>
+            <span class="fw-semibold">Informations du cluster</span>
+          </div>
+          <div class="card-body">
+            <div id="cluster-info-loading" class="text-center py-3">
+              <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+              <span class="ms-2 text-muted">Chargement…</span>
+            </div>
+            <table class="table table-sm info-table d-none" id="cluster-info-table">
+              <tbody>
+                <tr><td class="text-muted">Cluster</td><td id="ci-name" class="fw-medium"></td></tr>
+                <tr><td class="text-muted">Resource group</td><td id="ci-rg"></td></tr>
+                <tr><td class="text-muted">Région</td><td id="ci-region"></td></tr>
+                <tr><td class="text-muted">IP Nginx</td><td><code id="ci-nginx"></code></td></tr>
+                <tr><td class="text-muted">Pods Running</td><td id="ci-pods"></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accès Nginx -->
+      <div class="col-lg-6">
+        <div class="card dashboard-card h-100">
+          <div class="card-header">
+            <i class="fa-brands fa-nginx text-success me-2"></i>
+            <span class="fw-semibold">Application déployée — Nginx</span>
+          </div>
+          <div class="card-body d-flex flex-column justify-content-center align-items-center text-center py-4">
+            <div class="nginx-status-circle mb-3">
+              <i class="fa-solid fa-globe fa-2x text-success"></i>
+            </div>
+            <h5 class="fw-bold mb-1">nginx/1.29.8</h5>
+            <p class="text-muted mb-1">2 replicas · LoadBalancer</p>
+            <code class="nginx-ip mb-3">{{ nginx_ip }}</code>
+            <div class="d-flex gap-2">
+              <a href="http://{{ nginx_ip }}" target="_blank" class="btn btn-success">
+                <i class="fa-solid fa-arrow-up-right-from-square me-2"></i>Ouvrir l'application
+              </a>
+              <button class="btn btn-outline-secondary" onclick="checkNginx()">
+                <i class="fa-solid fa-heart-pulse me-1"></i>Tester
+              </button>
+            </div>
+            <div id="nginx-health" class="mt-2 small"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       SECTION : PODS
+  ========================================================= -->
+  <section id="section-pods" class="content-section">
+    <div class="section-header">
+      <h2><i class="fa-solid fa-cubes me-2 text-primary"></i>Pods</h2>
+      <p class="text-muted">Liste complète des pods dans tous les namespaces</p>
+    </div>
+
+    <!-- Filtres -->
+    <div class="card dashboard-card mb-3">
+      <div class="card-body py-2">
+        <div class="d-flex flex-wrap gap-3 align-items-center">
+          <div class="input-group input-group-sm" style="width:220px;">
+            <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
+            <input type="text" class="form-control" id="pod-search" placeholder="Rechercher un pod…" oninput="filterPods()">
+          </div>
+          <select class="form-select form-select-sm" id="ns-filter" style="width:180px;" onchange="filterPods()">
+            <option value="">Tous les namespaces</option>
+          </select>
+          <select class="form-select form-select-sm" id="status-filter" style="width:150px;" onchange="filterPods()">
+            <option value="">Tous les statuts</option>
+            <option value="Running">Running</option>
+            <option value="Pending">Pending</option>
+            <option value="Failed">Failed</option>
+          </select>
+          <span class="text-muted small ms-auto" id="pod-count-label"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table pods -->
+    <div class="card dashboard-card">
+      <div class="card-body p-0">
+        <div id="pods-loading" class="text-center py-5">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="text-muted mt-2">Chargement des pods…</p>
+        </div>
+        <div class="table-responsive d-none" id="pods-table-wrapper">
+          <table class="table table-hover pods-table mb-0">
+            <thead>
+              <tr>
+                <th>Namespace</th>
+                <th>Nom du Pod</th>
+                <th>Statut</th>
+                <th>Prêt</th>
+                <th>Redémarrages</th>
+                <th>Âge</th>
+                <th>Nœud</th>
+              </tr>
+            </thead>
+            <tbody id="pods-tbody"></tbody>
+          </table>
+        </div>
+        <div id="pods-empty" class="text-center py-5 d-none">
+          <i class="fa-solid fa-box-open fa-2x text-muted mb-2"></i>
+          <p class="text-muted">Aucun pod trouvé.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       SECTION : DEPLOYMENTS
+  ========================================================= -->
+  <section id="section-deployments" class="content-section">
+    <div class="section-header">
+      <h2><i class="fa-solid fa-rocket me-2 text-primary"></i>Deployments</h2>
+      <p class="text-muted">Deployments Kubernetes et état des replicas</p>
+    </div>
+
+    <div class="card dashboard-card">
+      <div class="card-body p-0">
+        <div id="deploy-loading" class="text-center py-5">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="text-muted mt-2">Chargement…</p>
+        </div>
+        <div class="table-responsive d-none" id="deploy-table-wrapper">
+          <table class="table table-hover pods-table mb-0">
+            <thead>
+              <tr>
+                <th>Namespace</th>
+                <th>Deployment</th>
+                <th>Replicas désirés</th>
+                <th>Prêts</th>
+                <th>Disponibles</th>
+                <th>Âge</th>
+                <th>État</th>
+              </tr>
+            </thead>
+            <tbody id="deploy-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       SECTION : NŒUDS
+  ========================================================= -->
+  <section id="section-nodes" class="content-section">
+    <div class="section-header">
+      <h2><i class="fa-solid fa-server me-2 text-primary"></i>Nœuds</h2>
+      <p class="text-muted">Nœuds worker du cluster AKS</p>
+    </div>
+
+    <div id="nodes-loading" class="text-center py-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="text-muted mt-2">Chargement des nœuds…</p>
+    </div>
+    <div class="row g-4" id="nodes-container"></div>
+  </section>
+
+</div><!-- /main-content -->
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Dashboard JS -->
+<script src="/static/js/dashboard.js"></script>
+</body>
+</html>

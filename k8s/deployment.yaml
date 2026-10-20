@@ -1,0 +1,50 @@
+# Déploiement du dashboard dans AKS (option avancée)
+# Prérequis : image poussée dans un ACR, rbac.yaml appliqué
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aks-dashboard
+  namespace: default
+  labels:
+    app: aks-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aks-dashboard
+  template:
+    metadata:
+      labels:
+        app: aks-dashboard
+    spec:
+      serviceAccountName: dashboard-sa   # Utilise le ServiceAccount RBAC
+      containers:
+        - name: dashboard
+          image: <ACR_NAME>.azurecr.io/aks-dashboard:latest
+          ports:
+            - containerPort: 5000
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          env:
+            - name: FLASK_ENV
+              value: "production"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aks-dashboard-svc
+  namespace: default
+spec:
+  selector:
+    app: aks-dashboard
+  ports:
+    - port: 80
+      targetPort: 5000
+  type: LoadBalancer
